@@ -159,7 +159,7 @@ local function show_ruff_errors()
                     end
                 end
 
-                -- Make the window 30% bigger
+                -- Make the window
                 local height = math.floor(math.min(20, #buffer_lines) * 1.3)  -- Up to 26 lines
                 local row = math.floor((vim.o.lines - height) / 2)
                 local col = math.floor((vim.o.columns - width) / 2)
@@ -184,7 +184,8 @@ local function show_ruff_errors()
         vim.notify("Failed to start Ruff", vim.log.levels.ERROR)
     end
 end
--- Your fixed format_ruff function
+
+-- Format Function
 local function format_ruff()
     local file = vim.fn.expand('%:p')
     if vim.bo.filetype ~= 'python' then
