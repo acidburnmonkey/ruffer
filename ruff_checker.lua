@@ -1,3 +1,51 @@
+-- Function to fix errors with Ruff
+function FixRuffErrors()
+    local buf = vim.api.nvim_get_current_buf()
+    local success, original_file = pcall(vim.api.nvim_buf_get_var, buf, 'original_file')
+    if not success or not original_file then
+        vim.notify("Original file not set", vim.log.levels.ERROR)
+        return
+    end
+
+    local output_lines = {}
+    vim.fn.jobstart({'ruff', 'check', '--fix', original_file}, {
+        on_stdout = function(_, data)
+            for _, line in ipairs(data) do
+                if line ~= "" then
+                    table.insert(output_lines, line)
+                end
+            end
+        end,
+        on_stderr = function(_, data)
+            for _, line in ipairs(data) do
+                if line ~= "" then
+                    table.insert(output_lines, line)
+                end
+            end
+        end,
+        on_exit = function(_, code)
+            vim.cmd('checktime')
+            local summary = table.concat(output_lines, "\n")
+            local fixed, remaining = summary:match("Found %d+ errors %((%d+) fixed, (%d+) remaining%)")
+            if fixed and remaining then
+                if tonumber(fixed) > 0 then
+                    vim.notify(string.format("Fixed %s errors, %s remaining", fixed, remaining), vim.log.levels.INFO)
+                else
+                    vim.notify("No errors fixed, " .. remaining .. " remaining", vim.log.levels.WARN)
+                end
+            elseif summary:match("No fixes available") then
+                vim.notify("No fixes available", vim.log.levels.WARN)
+            elseif code == 0 then
+                vim.notify("No errors found or no changes made", vim.log.levels.INFO)
+            else
+                vim.notify("Failed to fix errors: " .. summary, vim.log.levels.ERROR)
+            end
+            vim.cmd('close')
+        end
+    })
+end
+
+-- Function to show Ruff errors in a floating window
 local function show_ruff_errors()
     local file = vim.fn.expand('%:p')
     if vim.bo.filetype ~= 'python' then
@@ -7,37 +55,40 @@ local function show_ruff_errors()
 
     local output_lines = {}
     local job_id = vim.fn.jobstart({'ruff', 'check', file}, {
-        on_stdout = function(j, d, e)
-            for _, line in ipairs(d) do
+        on_stdout = function(_, data)
+            for _, line in ipairs(data) do
                 if line ~= "" then
                     table.insert(output_lines, line)
                 end
             end
         end,
-        on_stderr = function(j, d, e)
-            for _, line in ipairs(d) do
+        on_stderr = function(_, data)
+            for _, line in ipairs(data) do
                 if line ~= "" then
                     table.insert(output_lines, line)
                 end
             end
         end,
-        on_exit = function(j, code, e)
+        on_exit = function(_, code)
             if #output_lines == 0 then
                 vim.notify("No errors found", vim.log.levels.INFO)
             else
                 local buf = vim.api.nvim_create_buf(false, true)
+                vim.api.nvim_buf_set_var(buf, 'original_file', file)
                 table.insert(output_lines, "F -> --fix")
                 vim.api.nvim_buf_set_lines(buf, 0, -1, false, output_lines)
                 -- Apply syntax highlighting
                 for lnum, line in ipairs(output_lines) do
-                    if lnum < #output_lines then  -- Skip the UI hint line
-                        local file, row, col, code, msg = string.match(line, "^(.-):(%d+):(%d+): (%w+) (.*)$")
-                        if not file then
-                            file, row, code, msg = string.match(line, "^(.-):(%d+): (%w+) (.*)$")
+                    if lnum < #output_lines then
+                        -- Match error lines like "file.py:8:9: F841 Unused variable"
+                        local file_path, row, col, code, msg = string.match(line, "^(.-):(%d+):(%d+): (%w+) (.*)$")
+                        if not file_path then
+                            -- Fallback for lines without column numbers
+                            file_path, row, code, msg = string.match(line, "^(.-):(%d+): (%w+) (.*)$")
                         end
-                        if file then
-                            vim.api.nvim_buf_add_highlight(buf, -1, 'Directory', lnum-1, 0, #file)
-                            local start_col = #file + 1
+                        if file_path then
+                            vim.api.nvim_buf_add_highlight(buf, -1, 'Directory', lnum-1, 0, #file_path)
+                            local start_col = #file_path + 1
                             local end_col = start_col + #row
                             vim.api.nvim_buf_add_highlight(buf, -1, 'LineNr', lnum-1, start_col, end_col)
                             if col and col ~= "" then
@@ -50,6 +101,15 @@ local function show_ruff_errors()
                             end
                             local code_end = start_col + #code
                             vim.api.nvim_buf_add_highlight(buf, -1, 'Error', lnum-1, start_col, code_end)
+                        else
+                            -- Highlight error indicators like "  |     ^^ F841"
+                            local indicator = string.match(line, "^%s+%|%s+(.*)")
+                            if indicator then
+                                local caret_start = string.find(line, "%^")
+                                if caret_start then
+                                    vim.api.nvim_buf_add_highlight(buf, -1, 'Error', lnum-1, caret_start - 1, -1)
+                                end
+                            end
                         end
                     else
                         -- Highlight the UI hint
@@ -82,17 +142,7 @@ local function show_ruff_errors()
     end
 end
 
-function FixRuffErrors()
-    local file = vim.fn.expand('%:p')
-    vim.fn.jobstart({'ruff', 'check', '--fix', file}, {
-        on_exit = function(j, code, e)
-            vim.cmd('checktime')
-            vim.notify("Errors fixed", vim.log.levels.INFO)
-            vim.cmd('close')
-        end
-    })
-end
-
+-- Your fixed format_ruff function
 local function format_ruff()
     local file = vim.fn.expand('%:p')
     if vim.bo.filetype ~= 'python' then
@@ -107,10 +157,12 @@ local function format_ruff()
     })
 end
 
+-- Set up keybindings for Python files
 vim.api.nvim_create_autocmd("FileType", {
     pattern = "python",
     callback = function()
         vim.keymap.set('n', '<F5>', show_ruff_errors, { buffer = true })
         vim.keymap.set('n', '<F7>', format_ruff, { buffer = true })
     end,
-})
+})-- Expose the function to be called via command or keymap
+vim.api.nvim_create_user_command('RuffCheck', show_ruff_errors, {})
