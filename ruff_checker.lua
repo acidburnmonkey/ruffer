@@ -207,4 +207,7 @@ vim.api.nvim_create_autocmd("FileType", {
         vim.keymap.set('n', '<F7>', format_ruff, { buffer = true })
     end,
 })
+
+-- Expose api,  Set up user commands
 vim.api.nvim_create_user_command('Ruffer', show_ruff_errors, {})
+vim.api.nvim_create_user_command('RufferFormat', format_ruff, {})
