@@ -1,3 +1,10 @@
+-- Define custom highlights
+vim.api.nvim_set_hl(0, 'Error', { fg = 'red' })
+vim.api.nvim_set_hl(0, 'LineNr', { fg = 'yellow' })
+vim.api.nvim_set_hl(0, 'Directory', { fg = 'blue' })
+vim.api.nvim_set_hl(0, 'MoreMsg', { fg = 'green' })
+vim.api.nvim_set_hl(0, 'RuffSeparator', { fg = 'gray' })
+
 -- Function to fix errors with Ruff
 function FixRuffErrors()
     local buf = vim.api.nvim_get_current_buf()
@@ -53,33 +60,71 @@ local function show_ruff_errors()
         return
     end
 
+    local width = math.floor(80 * 1.3)  -- 104 columns
+
     local output_lines = {}
+    local summary_lines = {}
+    local in_summary = false
     local job_id = vim.fn.jobstart({'ruff', 'check', file}, {
         on_stdout = function(_, data)
             for _, line in ipairs(data) do
                 if line ~= "" then
-                    table.insert(output_lines, line)
+                    if line:match("^Found %d+ errors") or line:match("^No fixes available") then
+                        in_summary = true
+                    end
+                    if in_summary then
+                        table.insert(summary_lines, line)
+                    else
+                        table.insert(output_lines, line)
+                    end
                 end
             end
         end,
         on_stderr = function(_, data)
             for _, line in ipairs(data) do
                 if line ~= "" then
-                    table.insert(output_lines, line)
+                    if line:match("^Found %d+ errors") or line:match("^No fixes available") then
+                        in_summary = true
+                    end
+                    if in_summary then
+                        table.insert(summary_lines, line)
+                    else
+                        table.insert(output_lines, line)
+                    end
                 end
             end
         end,
         on_exit = function(_, code)
-            if #output_lines == 0 then
+            if #output_lines == 0 and #summary_lines == 0 then
                 vim.notify("No errors found", vim.log.levels.INFO)
             else
                 local buf = vim.api.nvim_create_buf(false, true)
                 vim.api.nvim_buf_set_var(buf, 'original_file', file)
-                table.insert(output_lines, "F -> --fix")
-                vim.api.nvim_buf_set_lines(buf, 0, -1, false, output_lines)
+
+                -- Prepare buffer content: summary, UI hint, separator, then errors
+                local buffer_lines = {}
+                for _, line in ipairs(summary_lines) do
+                    table.insert(buffer_lines, line)
+                end
+                table.insert(buffer_lines, "[F] -> --fix")
+                table.insert(buffer_lines, string.rep("_",width))
+                for _, line in ipairs(output_lines) do
+                    table.insert(buffer_lines, line)
+                end
+                vim.api.nvim_buf_set_lines(buf, 0, -1, false, buffer_lines)
+
                 -- Apply syntax highlighting
-                for lnum, line in ipairs(output_lines) do
-                    if lnum < #output_lines then
+                for lnum, line in ipairs(buffer_lines) do
+                    if lnum <= #summary_lines then
+                        -- Highlight summary lines
+                        vim.api.nvim_buf_add_highlight(buf, -1, 'MoreMsg', lnum-1, 0, -1)
+                    elseif line:match("%[F%] -> --fix") then
+                        -- Highlight the UI hint
+                        vim.api.nvim_buf_add_highlight(buf, -1, 'MoreMsg', lnum-1, 0, -1)
+                    elseif line:match("^" .. string.rep("_", width) .. "$") then
+                        -- Highlight separator
+                        vim.api.nvim_buf_add_highlight(buf, -1, 'RuffSeparator', lnum-1, 0, -1)
+                    else
                         -- Match error lines like "file.py:8:9: F841 Unused variable"
                         local file_path, row, col, code, msg = string.match(line, "^(.-):(%d+):(%d+): (%w+) (.*)$")
                         if not file_path then
@@ -111,13 +156,11 @@ local function show_ruff_errors()
                                 end
                             end
                         end
-                    else
-                        -- Highlight the UI hint
-                        vim.api.nvim_buf_add_highlight(buf, -1, 'MoreMsg', lnum-1, 0, -1)
                     end
                 end
-                local width = 80
-                local height = math.min(20, #output_lines)
+
+                -- Make the window 30% bigger
+                local height = math.floor(math.min(20, #buffer_lines) * 1.3)  -- Up to 26 lines
                 local row = math.floor((vim.o.lines - height) / 2)
                 local col = math.floor((vim.o.columns - width) / 2)
                 local win = vim.api.nvim_open_win(buf, true, {
@@ -141,7 +184,6 @@ local function show_ruff_errors()
         vim.notify("Failed to start Ruff", vim.log.levels.ERROR)
     end
 end
-
 -- Your fixed format_ruff function
 local function format_ruff()
     local file = vim.fn.expand('%:p')
@@ -164,5 +206,5 @@ vim.api.nvim_create_autocmd("FileType", {
         vim.keymap.set('n', '<F5>', show_ruff_errors, { buffer = true })
         vim.keymap.set('n', '<F7>', format_ruff, { buffer = true })
     end,
-})-- Expose the function to be called via command or keymap
-vim.api.nvim_create_user_command('RuffCheck', show_ruff_errors, {})
+})
+vim.api.nvim_create_user_command('Ruffer', show_ruff_errors, {})
