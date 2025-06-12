@@ -6,7 +6,7 @@ vim.api.nvim_set_hl(0, 'MoreMsg', { fg = 'green' })
 vim.api.nvim_set_hl(0, 'RuffSeparator', { fg = 'gray' })
 
 -- Function to fix errors with Ruff
-function FixRuffErrors()
+local function FixRuffErrors()
     local buf = vim.api.nvim_get_current_buf()
     local success, original_file = pcall(vim.api.nvim_buf_get_var, buf, 'original_file')
     if not success or not original_file then
@@ -174,7 +174,7 @@ local function show_ruff_errors()
                 })
                 vim.api.nvim_buf_set_option(buf, 'modifiable', false)
                 vim.api.nvim_buf_set_option(buf, 'readonly', true)
-                vim.api.nvim_buf_set_keymap(buf, 'n', 'F', ':lua FixRuffErrors()<CR>', {noremap = true, silent = true})
+                vim.api.nvim_buf_set_keymap(buf, 'n', 'F', ':lua require("ruffer").FixRuffErrors()<CR>', {noremap = true, silent = true})
                 vim.api.nvim_buf_set_keymap(buf, 'n', 'q', ':close<CR>', {noremap = true, silent = true})
                 vim.api.nvim_buf_set_keymap(buf, 'n', '<Esc>', ':close<CR>', {noremap = true, silent = true})
             end
@@ -209,6 +209,13 @@ vim.api.nvim_create_autocmd("FileType", {
     end,
 })
 
--- Expose api,  Set up user commands
-vim.api.nvim_create_user_command('Ruffer', show_ruff_errors, {})
-vim.api.nvim_create_user_command('RufferFormat', format_ruff, {})
+-- Expose functions and commands
+return {
+    FixRuffErrors = FixRuffErrors,
+    show_ruff_errors = show_ruff_errors,
+    format_ruff = format_ruff,
+    setup = function()
+        vim.api.nvim_create_user_command('Ruffer', show_ruff_errors, {})
+        vim.api.nvim_create_user_command('RufferFormat', format_ruff, {})
+    end
+}

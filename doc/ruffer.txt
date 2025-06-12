@@ -1,0 +1,26 @@
+*ruffer.txt*    Ruffer: A Neovim plugin for Ruff linting
+
+*Ruffer* *RufferFormat*
+
+Ruffer integrates Ruff into Neovim.
+
+COMMANDS                                    *:Ruffer* *:RufferFormat*
+
+:Ruffer                 Show errors in a floating window.
+                        Press `F` to fix, `q` or `<Esc>` to close.
+:RufferFormat           Format the current Python file.
+
+KEYBINDINGS
+
+<F5>                    Show errors
+<F7>                    Format file
+
+HIGHLIGHTS
+
+Error                   Error codes/indicators (red)
+LineNr                  Line/column numbers (yellow)
+Directory               File paths (blue)
+MoreMsg                 Summary and "[F] -> --fix" (green)
+RuffSeparator           Separator (gray)
+
+vim:tw=78:ts=8:ft=help:norl:

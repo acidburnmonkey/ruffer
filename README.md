@@ -7,6 +7,29 @@ open a new terminal window. It supports pyproject.toml and ruff.toml.
 
 - ruff must me on your path [Astral Site](https://docs.astral.sh/ruff/installation/)
 
+### Lazy
+
+```lua
+{
+    'acidburnmonkey/ruffer',
+    config = function()
+      require('ruffer').setup()
+    end,
+  },
+```
+
+### Or Others
+
+```
+ {'acidburnmonkey/ruffer'}
+```
+
+on init.lua add
+
+```lua
+require('ruffer').setup()
+```
+
 # Key Mappings
 
 ### Defaults
