@@ -30,6 +30,10 @@ on init.lua add
 require('ruffer').setup()
 ```
 
+# Screenshot
+
+![ruffer](img/image.png)
+
 # Key Mappings
 
 ### Defaults
