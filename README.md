@@ -5,7 +5,7 @@ open a new terminal window. It supports pyproject.toml and ruff.toml.
 
 # Install
 
-- ruff must me on your path [Astral Site](https://docs.astral.sh/ruff/installation/)
+- ruff must be on your path [Astral Site](https://docs.astral.sh/ruff/installation/)
 
 ### Lazy
 
